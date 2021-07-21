@@ -6,11 +6,14 @@ import './styles/index.css';
 import './styles/todo-list.css';
 import './styles/filters.css';
 
+import { TodosContextProvider } from './components';
 import TodoApp from './TodoApp';
 
 ReactDOM.render(
   <HashRouter>
-    <TodoApp />
+    <TodosContextProvider>
+      <TodoApp />
+    </TodosContextProvider>
   </HashRouter>,
   document.getElementById('root'),
 );

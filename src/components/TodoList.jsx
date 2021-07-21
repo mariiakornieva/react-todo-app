@@ -1,11 +1,33 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { useLocation } from 'react-router-dom';
 import cn from 'classnames';
 
-export function TodoList({
-  todos, allToggled, handleToggle, handleToggleAll, handleDelete,
-}) {
+import { TodoItem } from './TodoItem';
+import { FILTERS, INVALID_TODO_ID } from '../constants';
+
+export function TodoList({ todos, isToggleAllChecked, handleToggleAll }) {
+  const { pathname } = useLocation();
+  const [currentEditedItem, setCurrentEditedItem] = useState(INVALID_TODO_ID);
+
+  const filteredTodos = useMemo(
+    () => (
+      todos.filter(({ completed }) => {
+        switch (pathname) {
+          case FILTERS.active:
+            return !completed;
+
+          case FILTERS.completed:
+            return completed;
+
+          case FILTERS.all:
+          default:
+            return true;
+        }
+      })
+    )
+    , [todos, pathname],
+  );
 
   return (
     <section className="main">
@@ -15,7 +37,7 @@ export function TodoList({
             type="checkbox"
             id="toggle-all"
             className="toggle-all"
-            checked={allToggled}
+            checked={isToggleAllChecked}
             onChange={handleToggleAll}
           />
           <label htmlFor="toggle-all">
@@ -24,31 +46,20 @@ export function TodoList({
         </>
       )}
 
-      {/* Switch - Route - filter todos */}
       <ul className="todo-list">
-        {todos.map(todo => (
+        {filteredTodos.map(todo => (
           <li
             key={todo.id}
             className={cn({
               completed: todo.completed,
-              editing: false,
+              editing: currentEditedItem === todo.id,
             })}
           >
-            <div className="view">
-              <input
-                type="checkbox"
-                className="toggle"
-                checked={todo.completed}
-                onChange={() => handleToggle(todo.id)}
-              />
-              <label>{todo.title}</label>
-              <button
-                type="button"
-                className="destroy"
-                onClick={() => handleDelete(todo.id)}
-              />
-            </div>
-            <input type="text" className="edit" />
+            <TodoItem
+              {...todo}
+              editing={currentEditedItem === todo.id}
+              onEdit={setCurrentEditedItem}
+            />
           </li>
         ))}
       </ul>
@@ -59,19 +70,14 @@ export function TodoList({
 TodoList.propTypes = {
   todos: PropTypes.arrayOf(
     PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      title: PropTypes.string,
-      completed: PropTypes.bool,
+      id: PropTypes.number.isRequired,
     }),
   ),
-  handleToggle: PropTypes.func,
-  handleDelete: PropTypes.func,
-  handleToggleAll: PropTypes.func,
+  isToggleAllChecked: PropTypes.bool,
+  handleToggleAll: PropTypes.func.isRequired,
 };
 
 TodoList.defaultProps = {
   todos: [],
-  handleToggle: () => {},
-  handleDelete: () => {},
-  handleToggleAll: () => {},
+  isToggleAllChecked: false,
 };

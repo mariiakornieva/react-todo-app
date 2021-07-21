@@ -1,113 +1,74 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
-import uuid from 'react-uuid';
-
-import { TodoList } from './components/TodoList';
-import { TodoFooter } from './components/TodoFooter';
-import { NewTodo } from './components/NewTodo';
-
-const FILTERS = {
-  all: '/',
-  active: '/active',
-  completed: '/completed',
-};
+import React, { useMemo, useContext } from 'react';
+import { TodosContext } from './context/TodosContext';
+import { actions } from './reducers/todosReducer';
+import { NewTodo, TodoList, TodoFooter, UserInfo } from './components';
+import { deleteTodo, toggleTodo } from './api';
+import { useUser } from './hooks/useUser';
 
 function TodoApp() {
-  const [todos, setTodos] = useState([]);
-  const [allToggled, setAllToggled] = useState(false);
-  const { pathname } = useLocation();
+  const { todos, dispatch } = useContext(TodosContext);
+  const user = useUser();
 
-  const filteredTodos = useMemo(
-    () => (
-      todos.filter(({ completed }) => {
-        switch (pathname) {
-          case FILTERS.all:
-            return true;
+  const [activeCount, completedCount] = useMemo(() => {
+    const completed = todos.filter(todo => todo.completed).length;
+    const active = todos.length - completed;
 
-          case FILTERS.active:
-            return !completed;
-
-          case FILTERS.completed:
-            return completed;
-
-          default:
-            return true;
-        }
-      })
-    )
-    , [todos],
-  );
-
-  useEffect(() => {
-    setAllToggled(todos.every(({ completed }) => completed));
+    return [active, completed];
   }, [todos]);
 
-  const handleToggle = (id) => {
-    setAllToggled(false);
+  const isToggleAllChecked = useMemo(() => (
+    todos.every(({ completed }) => completed)
+  ), [todos]);
 
-    setTodos(todos.map((todo) => {
-      if (todo.id !== id) {
-        return todo;
-      }
+  const handleToggleAll = async() => {
+    dispatch(actions.toggleAll());
 
-      return {
-        id, title: todo.title, completed: !todo.completed,
-      };
-    }));
-  };
-
-  const handleToggleAll = () => {
-    if (allToggled) {
-      setTodos(todos.map(({ id, title, completed }) => ({
-        id, title, completed: !completed,
-      })));
+    if (isToggleAllChecked || todos.every(todo => !todo.completed)) {
+      await Promise.allSettled(
+        todos.map(todo => toggleTodo(todo.id, !todo.completed)),
+      );
     } else {
-      setAllToggled(true);
-      setTodos(todos.map(({ id, title }) => ({
-        id, title, completed: true,
-      })));
+      await Promise.allSettled(
+        todos.filter(todo => !todo.completed)
+          .map(todo => toggleTodo(todo.id, true)),
+      );
     }
   };
 
-  const handleDelete = (id) => {
-    setTodos(todos.filter(todo => (
-      todo.id !== id
-    )));
-  };
+  const handleDeleteCompleted = async() => {
+    dispatch(actions.deleteCompleted());
 
-  const handleAddTodo = (title) => {
-    setTodos(currentTodos => [
-      ...currentTodos,
-      { id: uuid(), title, completed: false },
-    ]);
-  };
-
-  const handleClearCompleted = () => {
-    setTodos(todos.filter(todo => !todo.completed));
+    await Promise.allSettled(
+      todos.filter(todo => todo.completed)
+        .map(todo => deleteTodo(todo.id)),
+    );
   };
 
   return (
-    <section className="todoapp">
-      <header className="header">
-        <h1>todos</h1>
-        <NewTodo handleSubmit={handleAddTodo} />
-      </header>
+    <>
+      <section className="todoapp">
+        <header className="header">
+          <h1>todos</h1>
+          <NewTodo />
+        </header>
 
-      <TodoList
-        todos={filteredTodos}
-        allToggled={allToggled}
-        handleToggle={handleToggle}
-        handleToggleAll={handleToggleAll}
-        handleDelete={handleDelete}
-      />
-
-      {todos.length > 0 && (
-        <TodoFooter
-          todos={filteredTodos}
-          handleClearCompleted={handleClearCompleted}
+        <TodoList
+          todos={todos}
+          handleToggleAll={handleToggleAll}
+          isToggleAllChecked={isToggleAllChecked}
         />
-      )}
-    </section>
+
+        {todos.length > 0 && (
+          <TodoFooter
+            activeCount={activeCount}
+            completedCount={completedCount}
+            handleDeleteCompleted={handleDeleteCompleted}
+          />
+        )}
+      </section>
+
+      <UserInfo name={user.name} />
+    </>
   );
 }
 
